@@ -54,17 +54,19 @@
         	%    \modifica{parametro1, parametro2,..}
             \requiere{
                 |trayectorias| = |cooperan| = |eventos| = |apuestas| = |pagos| \\
-                \land (\forall i : \nat)(0 \leq i < |trayectorias| \implicaLuego |trayectoria[i]| = 1) \\
+                %% Pido esto para poder usar |eventos[0]| = #pasos
+                \land |eventos| \geq 1 \\
+                \land (\forall i : \nat)(0 \leq i < |trayectorias| \implicaLuego |trayectorias[i]| = 1) \\
                 \land (\forall i : \nat)(0 \leq i < |apuestas| \implicaLuego apuestaValida(apuestas[i]) \yLuego |apuestas[i]| = |pagos[i]|) \\
                 \land (\forall i, t : \nat)(0 \leq i < |eventos| \implicaLuego
                     0 \leq t < |eventos[i]| \implicaLuego 0 \leq eventos[i][t] < |apuestas[i]|
                 ) \\
-                \land (\forall i, j : \nat)(0 \leq i, j < |eventos| \implicaLuego |eventos[i]| = |eventos[j]|)
+                \land (\forall i, j : \nat)(0 \leq i, j < |eventos| \implicaLuego |eventos[i]| = |eventos[j]|) \\
             }
             \asegura{
-                    \texttt{trayectoriaLargoPlazo}(trayectorias, cooperan, apuestas, pagos, eventos)
+                    \texttt{trayectoriaLargoPlazo}(trayectorias, cooperan, apuestas, pagos, eventos, |trayectorias|, |eventos[0]|)
             }
-         	\aux{gananciaInd}{
+         	\aux{gananciaIndividual}{
                     ev : \nat,
                     apuestas: \TLista{\float},
                     pagos : \TLista{\float},
@@ -78,6 +80,7 @@
                     apuestas : \TLista{\TLista{\float}},
                     pagos : \TLista{\TLista{\float}}, \\
                     eventos : \TLista{\TLista{\nat}},
+                    \#individuos : \nat,
                     t : \nat
                     }
                     {\float}
@@ -91,8 +94,8 @@
                             0
                         }
                     }
-            \aux{\#individuos}{}{\nat}{|trayectorias|}
-            \aux{\#pasos}{}{\nat}{|apuestas[0]| + 1}
+            %\aux{\#individuos}{}{\nat}{|trayectorias|}
+            %\aux{\#pasos}{}{\nat}{|eventos[0]|}
         	\pred{apuestaValida}
                 {apuesta : \TLista{\float}}
                 {\sum_{i=0}^{|apuesta|-1} apuesta[i] = 1 \land (\forall i : \nat)(0 \leq i < |apuesta| \implicaLuego apuesta[i] \geq 0 )
@@ -103,17 +106,23 @@
                 cooperan : \TLista{\bool}, 
                 apuestas : \TLista{\TLista{\float}},\\
                 pagos : \TLista{\TLista{\float}},
-                eventos : \TLista{\TLista{\nat}}
+                eventos : \TLista{\TLista{\nat}},
+                \#individuos : \nat,
+                \#pasos : \nat
                 }
-                {(\forall i : \nat)(0 \leq i < \#individuos
-                \implicaLuego (\forall t : \nat)(1 < t < \#pasos
-                        \implicaLuego |trayectoria[i]| = \#pasos
-                        \yLuego trayectorias[i][t] = \dfrac{fondo(trayectorias, cooperan, apuestas, pagos, eventos, t)}{\#individuos}+\\
-                        + \IfThenElse{cooperan[i]}{
-                            0
-                        }{
-                            \texttt{gananciaIndividual}(eventos[i][t-1], apuestas[i], pagos[i], trayectorias[i][t-1])
-                        }
+                {
+                    (\forall i : \nat)(0 \leq i < \#individuos
+                    \implicaLuego (\forall t : \nat)(1 \leq t < \#pasos
+                    \implicaLuego \\
+                    |trayectorias[i]| = 1 + \#pasos
+                    \yLuego \\
+                    trayectorias[i][t] = \dfrac{fondo(trayectorias, cooperan, apuestas, pagos, eventos, \#individuos, t)}{\#individuos}\\
+                    + \IfThenElse{cooperan[i]}{
+                        0 \\
+                    }{
+                        \texttt{gananciaIndividual}(eventos[i][t-1], apuestas[i], pagos[i], trayectorias[i][t-1])
+                        \\
+                    }
                     ))
                 }
         \end{proc}
@@ -121,7 +130,6 @@
         \begin{proc}{trayectoriaExtrañaEscalera}{
             \In trayectoria : \TLista{\float}
         }{\bool}
-        	%    \modifica{parametro1, parametro2,..}
          	\requiere{|trayectoria| > 1}
          	\asegura{res = \True \leftrightarrow \texttt{existeMaximoLocal}(trayectoria)}
          	% \aux{auxiliar1}{parametros}{tipoRes}{expresion}
@@ -135,7 +143,7 @@
         \end{proc}
 
     \item 
-        \begin{proc}{individuoDecideSiCooperarONO}{
+        \begin{proc}{individuoDecideSiCooperarONo}{
             \In individuo : \nat,
             \In recursos : \TLista{\float}, 
             \Inout cooperan : \TLista{\bool}, \\
@@ -143,20 +151,31 @@
             \In pagos : \TLista{\TLista{\float}},
             \In eventos : \TLista{\TLista{\nat}}
         }{}
-        \requiere{|recursos| = |cooperan| = |eventos| = |apuestas| = |pagos|\\
+        \requiere{
+            |recursos| = |cooperan| = |eventos| = |apuestas| = |pagos| \\
+            %% 0 \leq i < |rec| es falso siempre que |rec| = 0
+            %% entonces esto implica |eventos| = |rec| > 1
+            %% y por lo tanto vale pedir eventos[0]
             \land 0 \leq individuo < |recursos|\\
             \land (\forall i : \nat)(0 \leq i < |apuestas| \implicaLuego apuestaValida(apuestas[i]) \yLuego |apuestas[i]| = |pagos[i]|) \\
             \land (\forall i, t : \nat)(0 \leq i < |eventos| \implicaLuego
                 0 \leq t < |eventos[i]| \implicaLuego 0 \leq eventos[i][t] < |apuestas[i]|
             ) \\
             \land (\forall i, j : \nat)(0 \leq i, j < |eventos| \implicaLuego |eventos[i]| = |eventos[j]|\\
-            \land cooperan = cooperan_0
+            \land cooperan = cooperan_0 \\
         }
         \asegura{
-            %% vale poner el exists en el setAt?
-            %% o ponemos (exists b : bool)(...)
-            %% o usamos if b then original else setAt
-            cooperan = \IfThenElse{\texttt{esMejorCooperar}(individuo, recursos, cooperan_0, apuestas, pagos, eventos)}{\texttt{setAt}(cooperan_0, individuo, \True)}{\texttt{setAt}(cooperan_0, individuo, \False)}
+            cooperan = \IfThenElse{
+                \texttt{esMejorCooperar}(individuo, recursos, cooperan_0, apuestas, pagos, eventos, \\
+                |recursos|, |eventos[0]|)
+                \\
+            }{
+                \texttt{setAt}(cooperan_0, individuo, \True)
+                \\
+            }{
+                \texttt{setAt}(cooperan_0, individuo, \False)
+                \\
+            } \\
         }
 
         \pred{esMejorCooperar}{
@@ -165,33 +184,46 @@
             $\text{cooperan}_0$ : \TLista{\bool}, 
             apuestas : \TLista{\TLista{\float}},
             pagos : \TLista{\TLista{\float}},
-            eventos : \TLista{\TLista{\nat}}
+            eventos : \TLista{\TLista{\nat}},
+            \#individuos : \nat,
+            \#pasos : \nat
         }{
-            (\exists tc, tn : \TLista{\TLista{\float}})(\texttt{coincidenRecursosIniciales}(tc, recursosIniciales) 
+            (\exists tc, tn : \TLista{\TLista{\float}})(
+            \\
+            \texttt{coincidenRecursosIniciales}(tc, recursosIniciales) 
+            \\
             \land \texttt{coincidenRecursosIniciales}(tn, recursosIniciales) 
+            \\
             \land \texttt{trayectoriaLargoPlazo}(
                 tc,
                 \texttt{setAt}(cooperan_0, individuo, \True),
                 apuestas,
                 pagos,
-                eventos
-            ) \land \texttt{trayectoriaLargoPlazo}(
+                eventos,
+                \#individuos,
+                \#pasos
+            ) 
+            \\
+            \land \texttt{trayectoriaLargoPlazo}(
                 tn,
                 \texttt{setAt}(cooperan_0, individuo, \False),
                 apuestas,
                 pagos,
-                eventos
+                eventos,
+                \#individuos,
+                \#pasos
             ) 
-            \land tc[individuo][|eventos[0]|-1] \geq tn[individuo][|eventos[0]|-1])
+            \\
+            \land tc[individuo][\#pasos] \geq tn[individuo][\#pasos])
         }
             
         
         \pred{coincidenRecursosIniciales}{
-            trayectoria : \TLista{\TLista{\float}},
+            trayectorias : \TLista{\TLista{\float}},
             recursosIniciales : \TLista{\float}
         }{
-            (\forall i : \nat)(0 \leq i < |recursos| \implicaLuego
-            trayectoria[i][0] = recursosIniciales[i])
+            (\forall i : \nat)(0 \leq i < |recursosIniciales| \implicaLuego
+            trayectorias[i][0] = recursosIniciales[i])
         }
     \end{proc}
 
@@ -205,38 +237,88 @@
         }{}
         	%    \modifica{parametro1, parametro2,..}
             \requiere{
-                |recursos| = |cooperan| = |eventos| = |apuestas| = |pagos|\\
-                \land 0 \leq individuo < |recursos|\\
+                |recursos| = |cooperan| = |eventos| = |apuestas| = |pagos| \\
+                \land 0 \leq individuo < |recursos| \\
                 \land (\forall i : \nat)(0 \leq i < |apuestas| \implicaLuego apuestaValida(apuestas[i]) \yLuego |apuestas[i]| = |pagos[i]|) \\
                 \land (\forall i, t : \nat)(0 \leq i < |eventos| \implicaLuego
                     0 \leq t < |eventos[i]| \implicaLuego 0 \leq eventos[i][t] < |apuestas[i]|
                 ) \\
                 \land (\forall i, j : \nat)(0 \leq i, j < |eventos| \implicaLuego |eventos[i]| = |eventos[j]|\\
-                \land apuestas = apuestas_0
+                \land apuestas = apuestas_0 \\
             }
          	\asegura{
-                (\exists t_M : \TLista{\TLista{\float}})(\texttt{todasApuestasValidas}(apuestas) \\
-                \land \texttt{coincidenRecursosIniciales}(t_M, recursos)\\
+                \texttt{noModificaOtrasApuestas}(apuestas_0,apuestas,individuo) \\
+                \land (\exists t_M : \TLista{\TLista{\float}})(
+                \texttt{todasApuestasValidas}(apuestas) \\
+                \land \texttt{coincidenRecursosIniciales}(t_M, recursos) \\
                 \land \texttt{trayectoriaLargoPlazo}(
-                t_M,
-                cooperan,
-                apuestas,
-                pagos,
-                eventos
-                )\\
-                \yLuego (\forall t,p: \TLista{\TLista{\float}})(\texttt{todasApuestasValidas}(p) \land \texttt{trayectoriaLargoPlazo}(
-                t,
-                cooperan,
-                p,
-                pagos,
-                eventos
-                )\\
-                \implicaLuego
-                (t_M[individuo][|eventos[0]|-1] \geq t[individuo][|eventos[0]|-1]))\\
-                \land (\forall j : \nat)(j \neq individuo \land 0 \leq j < |apuestas| \implicaLuego apuestas[j] = apuestas_0[j])}       
+                    t_M,
+                    cooperan,
+                    apuestas,
+                    pagos,
+                    eventos
+                ) \\
+                \yLuego \texttt{esTrayectoriaMaximal}(
+                    t_M,
+                    individuo,
+                    cooperan,
+                    pagos,
+                    eventos,
+                    |recursos|,
+                    |eventos[0]|
+                ) \\
+            }
+                \pred{esTrayectoriaMaximal}{
+                    $\text{t}_M$ : \TLista{\TLista{\float}}
+                    individuo : \nat,
+                    cooperan : \TLista{\bool}, 
+                    pagos : \TLista{\TLista{\float}},
+                    eventos : \TLista{\TLista{\nat}},
+                    \#individuos : \nat,
+                    \#pasos : \nat
+                }{
+                    (\forall t,ap: \TLista{\TLista{\float}})(
+                    \texttt{todasApuestasValidas}(ap) \\
+                    \land \texttt{trayectoriaLargoPlazo}(
+                        t,
+                        cooperan,
+                        ap,
+                        pagos,
+                        eventos,
+                        \#individuos,
+                        \#pasos
+                    ) \\
+                    \implicaLuego
+                    (t_M[individuo][\#pasos] \geq t[individuo][\#pasos])) \\
+                }
+                
+                \pred{todasApuestasValidas}{
+                    apuestas: \TLista{\TLista{\float}}
+                }{
+                    (\forall i : \nat)(0 \leq i < |apuestas| \implicaLuego apuestaValida(apuestas[i]))
+                }
 
-                \pred{todasApuestasValidas}{apuestas: \TLista{\TLista{\float}}}{(\forall i : \nat)(0 \leq i < |apuestas| \implicaLuego apuestaValida(apuestas[i]))}
-                   
+                \pred{noModificaOtrasApuestas}{
+                    $\text{apuestas}_0$ : \TLista{\TLista{\float}},
+                    apuestas : \TLista{\TLista{\float}},
+                    individuo : \nat,
+                }{
+                    |apuestas| = |apuestas_0| \\
+                    \yLuego
+                    (\forall i : \nat)(i \neq individuo \land 0 \leq i < |apuestas| \implicaLuego secuenciasCoinciden(apuestas[i],apuestas_0[i])) 
+                }
+                
+                \pred{secuenciasCoinciden}{
+                    $\text{s}_1$: \TLista{\float},
+                    $\text{s}_2$: \TLista{\float}
+                }{
+                    |s_1| = |s_2|
+                    \yLuego
+                    (\forall i : \nat)(0 \leq i < |s_1|
+                    \implicaLuego
+                        s_1[i] = s_2[i]
+                    )
+                }
             
          	% \aux{auxiliar1}{parametros}{tipoRes}{expresion}
         	% \pred{pred1}{parametros}{expresion} 
